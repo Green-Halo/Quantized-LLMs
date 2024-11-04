@@ -1,0 +1,8 @@
+pandas
+psutil
+tabulate
+dill
+jsonpickle
+datasets
+transformers
+./requirements/*.whl
