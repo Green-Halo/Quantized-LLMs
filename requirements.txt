@@ -5,4 +5,5 @@ dill
 jsonpickle
 datasets
 transformers
+onnxruntime-gpu
 ./requirements/*.whl

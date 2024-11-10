@@ -152,9 +152,9 @@ class RunnerConfig:
             ]
         )
         self.run_table_model = None
-        self.glue_tasks = ["sst2", "mrpc", "qqp", "mnli", "qnli", "rte", "wnli"]
-        self.quantization_type = ["awq-4-bit", "gptq-4-bit", "16-bit"]
-        self.datasets = {}
+        self.task_name = ["SA", "SPS", "NLI"]
+        self.quantization_type = ["awq-4-bit", "gptq-4-bit", "16-bit", "32-bit"]
+        self.tasks = {}
         self.sample_size = 300
         self.template = {}
         self.datas = defaultdict(list)
@@ -162,11 +162,11 @@ class RunnerConfig:
     def create_run_table_model(self) -> RunTableModel:
         output.console_log("Creating run table model...")
         factor1 = FactorModel("quantization_type", self.quantization_type)
-        factor2 = FactorModel("glue_tasks", self.glue_tasks)
+        factor2 = FactorModel("task_name", self.task_name)
 
         self.run_table_model = RunTableModel(
             factors=[factor1, factor2],
-            repetitions=1,
+            repetitions=5,
             data_columns=[
                 "Inference Time",
                 "GPU Energy",
@@ -188,111 +188,95 @@ class RunnerConfig:
     def before_experiment(self) -> None:
         output.console_log("Starting the experiment and loading the dataset...")
         
-        for task in self.glue_tasks:
-            print(f"正在加载数据集：{task}")
-            if task == "mnli":
-                # 加载 validation_matched 和 validation_mismatched，并将它们合并
-                dataset_matched = load_dataset("glue", task, split="validation_matched")
-                dataset_mismatched = load_dataset("glue", task, split="validation_mismatched")
-                # 使用 concatenate_datasets 方法合并两个数据集
-                dataset_full = concatenate_datasets([dataset_matched, dataset_mismatched])
-                # 随机抽取100个样本
-                dataset_sampled = dataset_full.shuffle(seed=42).select(range(self.sample_size))
-                self.datasets[task] = dataset_sampled
-            elif task == "wnli":
-                # 其他任务加载 validation 集
-                dataset_full = load_dataset("glue", task, split="train")
-                # 随机抽取100个样本
-                dataset_sampled = dataset_full.shuffle(seed=42).select(range(self.sample_size))
-                self.datasets[task] = dataset_sampled
-            elif task == "rte":
-                # 其他任务加载 validation 集
-                dataset_full = load_dataset("glue", task, split="train")
-                # 随机抽取100个样本
-                dataset_sampled = dataset_full.shuffle(seed=42).select(range(self.sample_size))
-                self.datasets[task] = dataset_sampled    
-            else:
-                # 其他任务加载 validation 集
-                dataset_full = load_dataset("glue", task, split="validation")
-                # 随机抽取100个样本
-                dataset_sampled = dataset_full.shuffle(seed=42).select(range(self.sample_size))
-                self.datasets[task] = dataset_sampled
+        # Load datasets
+        imdb = load_dataset("imdb", split="test").shuffle(seed=42).select(range(self.sample_size))
+        sst2 = load_dataset("glue", "sst2", split="validation").shuffle(seed=42).select(range(self.sample_size))
+        mrpc = load_dataset("glue", "mrpc", split="validation").shuffle(seed=42).select(range(self.sample_size))
+        qqp = load_dataset("glue", "qqp", split="validation").shuffle(seed=42).select(range(self.sample_size))
+        wnli = load_dataset("glue", "wnli", split="train").shuffle(seed=42).select(range(self.sample_size))
+        rte = load_dataset("glue", "rte", split="train").shuffle(seed=42).select(range(self.sample_size))
+        
+        # Define self.datasets
+        self.datasets = {
+            "imdb": imdb,
+            "sst2": sst2,
+            "mrpc": mrpc,
+            "qqp": qqp,
+            "wnli": wnli,
+            "rte": rte,
+        }
+
+        # Group dataset names under tasks
+        self.tasks = {
+            "SA": ["imdb", "sst2"],
+            "SPS": ["mrpc", "qqp"],
+            "NLI": ["wnli", "rte"],
+        }
 
         def format_example(data_task, example):
             if data_task == "mrpc":
                 return f"sentence1: '{example['sentence1']}' & sentence2: '{example['sentence2']}'"
             elif data_task == "qqp":
                 return f"sentence1: '{example['question1']}' & sentence2: '{example['question2']}'"
-            elif data_task == "mnli":
-                return f"premise: '{example['premise']}' & hypothesis: '{example['hypothesis']}'"
-            elif data_task == "qnli":
-                return f"question: '{example['question']}' & sentence: '{example['sentence']}'"
             elif data_task == "rte":
                 return f"sentence1: '{example['sentence1']}' & sentence2: '{example['sentence2']}'"
             elif data_task == "wnli":
                 return f"sentence1: '{example['sentence1']}' & sentence2: '{example['sentence2']}'"
             elif data_task == "sst2":
                 return f"{example['sentence']}"
+            elif data_task == "imdb":
+                return f"{example['text']}"
             else:
                 return None
 
-        # 遍历并处理每个数据集
-        for data_task, dataset in self.datasets.items():
-            for example in dataset:
-                formatted_text = format_example(data_task, example)
-                if formatted_text:
-                    self.datas[data_task].append({
-                        'text': formatted_text,
-                        'label': example['label']
-                    })
+        # Initialize data storage
+        from collections import defaultdict
+        self.datas = defaultdict(list)
+        
+        # Process and format each dataset
+        for task_name, dataset_names in self.tasks.items():
+            for data_task in dataset_names:
+                dataset = self.datasets[data_task]
+                for example in dataset:
+                    formatted_text = format_example(data_task, example)
+                    if formatted_text:
+                        self.datas[task_name].append({
+                            'text': formatted_text,
+                            'label': example['label']
+                        })
 
-        for key in self.glue_tasks:
-            if key == "sst2":
-                self.template[key] = """
+        # Initialize template storage
+        self.template = {}
+        
+        # Set up templates for each task
+        for task_name in self.tasks.keys():
+            if task_name == "SA":
+                self.template[task_name] = """
                 Prompt: "{input}"
-                Instruct: Answer as less as possible. Please determine the sentiment of this above sentence in Prompt. The options are: 0 if the sentence is negative. 1 if the sentence is positive.          No analyses or explanations.Only respond with 0 or 1.
+                Instruct: Answer as briefly as possible. Please determine the sentiment of the above sentence in Prompt. The options are: 0 if the sentence is negative, 1 if the sentence is positive. No analyses or explanations. Only respond with 0 or 1.
                 """
-            if key == "mrpc":
-                self.template[key] = """
+            elif task_name == "SPS":
+                self.template[task_name] = """
                 Prompt: "{input}"
-                Instruct: Answer as less as possible. Please determine whether the two sentences above in Prompt are equivalent, and return 1 if they are, or 0 if they are not.       No analyses or explanations.Only respond with 0 or 1.
+                Instruct: Answer as briefly as possible. Please determine whether the two sentences above in Prompt are equivalent, and return 1 if they are, or 0 if they are not. No analyses or explanations. Only respond with 0 or 1.
                 """
-            elif key == "qqp":
-                self.template[key] = """
+            elif task_name == "NLI":
+                self.template[task_name] = """
                 Prompt: "{input}"
-                Instruct: Answer as less as possible. Please determine whether a pair of sentences above in Prompt are semantically equivalent, and return 1 if they are semantically equivalent, or 0 if they are not semantically equivalent.         You can only return 0 or 1.
-                """
-            elif key == "mnli":
-                self.template[key]="""
-                Prompt: "{input}"
-                Instruct: Answer as less as possible. From the above premise sentence and hypothesis sentence in Prompt, Please determine the relationship between the two. The options are: 0 if the premise entails the hypothesis. 1 if the relationship is neutral. 2 if the hypothesis contradicts the premise.        Here are your sentences to evaluate: Premise: [Insert Premise Sentence Here] & Hypothesis: [Insert Hypothesis Sentence Here]
-            """
-            elif key=="qnli":
-                self.template[key] = """
-                Prompt: "{input}"
-                Instruct: Answer as less as possible. From the above question and sentence in Prompt, Please determine whether the sentence contains the answer to the question. The options are: 0 if the sentence contains the answer. 1 if the sentence does not contains the answer.        Here are your sentences to evaluate: question: [Insert Question Here] & sentence: [Insert Sentence Here]. No analyses or explanations. Only respond with 0, 1, or 2.
-                """
-            elif key=="rte":
-                self.template[key] ="""
-                Prompt: "{input}"
-                Instruct: Answer as less as possible. From the above two sentences in Prompt, Please determine whether two sentences are entailments. The options are: 0 if the sentences are entailments. 1 if the sentences are not entailments.           Here are your sentences to evaluate: sentence1: [Insert Sentence Here] & sentence2: [Insert Sentence Here]. No analyses or explanations.Only respond with 0 or 1.
-                """
-            elif key=="wnli":
-                self.template[key] = """
-                Prompt: "{input}"
-                Instruct: Answer as less as possible. From the above question and sentence in Prompt, Please determine whether the sentences contain the answer to the question. The options are: 0 if the sentence contains the answer. 1 if the sentence does not contains the answer.    Here are your sentences to evaluate: question: [Insert Question Here] & sentences: [Insert Sentence Here]. No analyses or explanations. Only respond with 0 or 1.
+                Instruct: Answer as briefly as possible. From the above two sentences in Prompt, please determine whether the sentences are entailments. The options are: 0 if the sentences are entailments, 1 if they are not. No analyses or explanations. Only respond with 0 or 1.
                 """
 
-        output.console_log(
-            f"Datasets loaded: {sum(len(dataset) for task_datasets in self.datasets.values() for dataset in task_datasets if dataset is not None)} samples."
-        )
+        # Output the total number of samples loaded
+        total_samples = sum(len(dataset) for dataset in self.datasets.values())
+        output.console_log(f"Datasets loaded: {total_samples} samples.")
+
 
     def before_run(self) -> None:
         output.console_log("Preparing for the next run...")
 
     def start_run(self, context: RunnerContext) -> None:
         quantization_type = context.run_variation["quantization_type"]
-        task_name = context.run_variation["glue_tasks"]
+        task_name = context.run_variation["task_name"]
         model = self.load_model(quantization_type)
         data = self.datas[task_name]
         chat_template = self.template[task_name]
@@ -385,12 +369,14 @@ class RunnerConfig:
             self.model_cache = {}
         output.console_log(f"Loading model for quantization type: {quantization_type}")
 
-        if quantization_type == "16-bit":
-            model = LLAMA("examples/onnx/models/Llama-3.1-8B-Instruct-ONNX", 512)
+        if quantization_type == "32-bit":
+            model = LLAMA("tasks/onnx/onnx_models/Llama-3.1-8B-Instruct-32bit-ONNX", 512)
+        elif quantization_type == "16-bit":
+            model = LLAMA("tasks/onnx/onnx_models/Llama-3.1-8B-Instruct-16bit-ONNX", 512)
         elif quantization_type == "awq-4-bit":
-            model = LLAMA("examples/onnx/models/Llama-3.1-8B-Instruct-AWQ-4bit-ONNX", 512)
+            model = LLAMA("tasks/onnx/onnx_models/Llama-3.1-8B-Instruct-AWQ-4bit-ONNX", 512)
         elif quantization_type == "gptq-4-bit":
-            model = LLAMA("examples/onnx/models/Llama-3.1-8B-Instruct-GPTQ-4bit-glue_base-ONNX", 512)
+            model = LLAMA("tasks/onnx/onnx_models/Llama-3.1-8B-Instruct-GPTQ-4bit-glue_base-ONNX", 512)
 
         return model
 
@@ -413,7 +399,7 @@ class RunnerConfig:
             labels = []
             predictions = []
             with EnergyContext(domains=[device], start_tag="start") as ctx:
-                for i, item in enumerate(data):
+                for item in data:
                     prompt = item['text']
                     label = item['label']
                     labels.append(label)
