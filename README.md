@@ -21,14 +21,16 @@ Our analysis explores whether quantization, while improving energy efficiency, a
   pip install -r requirements.txt
   ```
 
-### Installation 
-1. **Set Up Power Measurement Tools**  
-   Install `pyJoules` for energy measurements following instructions from the [pyJoules Repository](https://pypi.org/project/pyJoules/).
+### Download models 
+1. **Windows**  
+   ```
+   .\download_models\windows.ps1
+   ```
 
-2. **Set Up GPU Monitoring Tools**  
+2. **Linux**  
    Install `pynvml` to monitor GPU utilization. Use the following command:
    ```bash
-   pip install pynvml
+   bash ./download_models/linux.sh
    ```
 
 ## Running the project
