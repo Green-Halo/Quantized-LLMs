@@ -1,7 +1,7 @@
-# LLaMA3-8B-Instruct Quantization: Energy Efficiency and Performance Trade-offs
+# LLaMA-3.1-8B-Instruct Quantization: Energy Efficiency and Performance Trade-offs
 
 ## Overview
-This study aims to evaluate the **LLaMA3-8B-Instruct** model under 4-bit and 8-bit Post-Training Quantization (PTQ). Our focus is on **energy efficiency** and **performance** across different natural language processing (NLP) tasks, quantifying the trade-offs between reduced model precision and its impact on accuracy, energy consumption, and resource utilization.
+This study aims to evaluate the **LLaMA-3.1-8B-Instruct** model under 4-bit Post-Training Quantization (PTQ). Our focus is on **energy efficiency** and **performance** across different natural language processing (NLP) tasks, quantifying the trade-offs between reduced model precision and its impact on accuracy, energy consumption, and resource utilization.
 
 Our analysis explores whether quantization, while improving energy efficiency, affects model accuracy across NLP tasks. We assess three primary NLP task types:
 1. **Sentiment Analysis (SA)**
