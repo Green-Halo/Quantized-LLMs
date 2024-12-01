@@ -53,12 +53,12 @@ def init_gpu_meter():
         return None
 
 
-# 定义 gpu_available
+# Init gpu_available
 gpu_available = init_pynvml()
 gpu_meter = init_gpu_meter() if gpu_available else None
 
 
-# 初始化 psutil
+# Init psutil
 def init_psutil():
     try:
         psutil.cpu_percent(interval=None)
@@ -173,8 +173,8 @@ class RunnerConfig:
                 "CPU Energy",
                 "Memory Energy",
                 "Accuracy",
-                "GPU Busy Time",  # 新增
-                "CPU Busy Time",  # 新增
+                "GPU Busy Time", 
+                "CPU Busy Time", 
                 "Memory Usage",
             ],
         )
@@ -407,11 +407,11 @@ class RunnerConfig:
                     start_time = time.perf_counter()
                     cpu_start_time = time.process_time()
 
-                    # 开始测量 CPU 和内存能耗
+                    # get CPU and memory energy
                     cpu_start_energy = psutil.cpu_percent(interval=None)
                     memory_start_energy = psutil.virtual_memory().percent
                     
-                    # 运行模型
+                    # run model
                     output = model.run(chat_template, prompt)
                     
                     end_time = time.perf_counter()
@@ -421,7 +421,7 @@ class RunnerConfig:
                     cpu_busy_time = cpu_end_time - cpu_start_time
                     total_cpu_busy_time += cpu_busy_time
 
-                    # 结束测量 CPU 和内存能耗
+                    # get CPU and memory energy
                     cpu_end_energy = psutil.cpu_percent(interval=None)
                     memory_end_energy = psutil.virtual_memory().percent
                     total_cpu_energy += cpu_end_energy - cpu_start_energy
@@ -429,8 +429,7 @@ class RunnerConfig:
 
                     ctx.record(tag="inference_step")
                     output = output[:200]
-                    # 从输出字符串的头开始查找第一个'0'、'1'或'2'
-                    pred_label = -1  # 默认值，表示未找到有效的预测
+                    pred_label = -1
                     for ch in output:
                         if ch == '0':
                             pred_label = 0
@@ -442,10 +441,8 @@ class RunnerConfig:
                             pred_label = 2
                             break
                         elif ch in [' ', '\n', '\t']:
-                            # 跳过空白字符
                             continue
                         else:
-                            # 遇到非数字字符，继续查找
                             continue
                     predictions.append(pred_label)
 

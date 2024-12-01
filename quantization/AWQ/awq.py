@@ -2,7 +2,7 @@ import time, os, torch
 from awq import AutoAWQForCausalLM
 from transformers import AutoTokenizer
 
-save_dir = "/mnt/2T/Codes/models/quantized_model"
+save_dir = "/path/to/save/quantized_model"
 os.makedirs(save_dir, exist_ok=True)
 
 model_path = 'meta-llama/Llama-3.1-8B-Instruct'
@@ -11,7 +11,7 @@ quant_config = { "zero_point": True, "q_group_size": 128, "w_bit": 4, "version":
 tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
 
 # List of w_bit values
-w_bits = [8, 4]
+w_bits = 4
 for w_bit in w_bits:
     quant_config["w_bit"] = w_bit
     # Load model
