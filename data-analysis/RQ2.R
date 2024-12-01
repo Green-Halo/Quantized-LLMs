@@ -3,31 +3,35 @@ library(dplyr)
 library(rstatix)
 library(effsize)
 
-data <- read.csv("run_table_1.csv")
+# Set the width and height of the plotting area in inches
+options(repr.plot.width = 9, repr.plot.height = 9)
+
+data <- read.csv("run_tables/llama.csv")
 
 summary(data)
 
-# Update quantization_type factor levels
+# Update factor levels for quantization_type
 data$quantization_type <- trimws(data$quantization_type)
 
-# Update the order and levels of the factor
+# Update the order of factor levels
 data$quantization_type <- factor(data$quantization_type, levels = c("32-bit", "16-bit", "awq-4-bit", "gptq-4-bit"))
 
-# Plot accuracy boxplot by quantization type
+# Plot boxplot of accuracy by quantization type
 ggplot(data, aes(x = quantization_type, y = Accuracy, fill = quantization_type)) +
   geom_boxplot() +
+  geom_jitter(width = 0.2, height = 0.002, alpha = 0.5) +
   labs(title = "Accuracy by Quantization Type",
        x = "Quantization Type",
        y = "Accuracy (%)") +
   theme_minimal() +
-  theme(legend.position = "none",
-        legend.title = element_text(size = 12),
-        legend.text = element_text(size = 8),
+  theme(
+        legend.title = element_text(size = 16),
+        legend.text = element_text(size = 10),
         plot.title = element_text(hjust = 0.5, size = 14), # Title font size
-        axis.title.y = element_text(size = 11), # Y-axis title font size
-        axis.text.y = element_text(size = 11),
-        axis.title.x = element_text(size = 11), # X-axis title font size
-        axis.text.x = element_text(size = 11))
+        axis.title.y = element_text(size = 14), # Y-axis title font size
+        axis.text.y = element_text(size = 14),
+        axis.title.x = element_text(size = 14), # X-axis title font size
+        axis.text.x = element_text(size = 14))
 
 # Calculate mean and standard deviation of energy consumption for each quantization type
 energy_stats <- data %>%
@@ -39,12 +43,12 @@ energy_stats <- data %>%
 
 energy_stats
 
-# Calculate mean accuracy for each quantization type and task
+# Plot bar chart of accuracy by task and quantization type
 mean_accuracy <- data %>%
   group_by(quantization_type, task_name) %>%
   summarise(mean_accuracy = mean(Accuracy, na.rm = TRUE), .groups = 'drop')
 
-# Plot mean accuracy bar chart by quantization type and task
+# Create bar chart
 ggplot(mean_accuracy, aes(x = quantization_type, y = mean_accuracy, fill = task_name)) +
   geom_bar(stat = "identity", position = position_dodge(width = 0.9)) +
   geom_text(aes(label = sprintf("%.2f", mean_accuracy)), vjust = -0.5, position = position_dodge(width = 0.9)) +
@@ -53,13 +57,13 @@ ggplot(mean_accuracy, aes(x = quantization_type, y = mean_accuracy, fill = task_
        y = "Mean Accuracy") +
   theme_minimal() +
   theme(legend.position = "bottom",
-        legend.title = element_text(size = 12),
-        legend.text = element_text(size = 8),
+        legend.title = element_text(size = 16),
+        legend.text = element_text(size = 10),
         plot.title = element_text(hjust = 0.5, size = 14), # Title font size
-        axis.title.y = element_text(size = 11), # Y-axis title font size
-        axis.text.y = element_text(size = 11),
-        axis.title.x = element_text(size = 11), # X-axis title font size
-        axis.text.x = element_text(size = 11, angle = 45, hjust = 1)) # Rotate x-axis labels
+        axis.title.y = element_text(size = 14), # Y-axis title font size
+        axis.text.y = element_text(size = 14),
+        axis.title.x = element_text(size = 14), # X-axis title font size
+        axis.text.x = element_text(size = 14, angle = 45, hjust = 1)) # Rotate x-axis labels
 
 # Normality test
 shapiro_results <- data %>%
@@ -93,7 +97,7 @@ delta_16_gptq4 <- cliff.delta(data$Accuracy[data$quantization_type == "16-bit"],
 delta_awq4_gptq4 <- cliff.delta(data$Accuracy[data$quantization_type == "awq-4-bit"],
                                 data$Accuracy[data$quantization_type == "gptq-4-bit"])
 
-# Print results
+# Output results
 print(list("32-bit vs 16-bit" = delta_32_16,
            "32-bit vs awq-4-bit" = delta_32_awq4,
            "32-bit vs gptq-4-bit" = delta_32_gptq4,
