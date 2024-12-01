@@ -37,14 +37,16 @@ Our analysis explores whether quantization, while improving energy efficiency, a
 
 To run the main experiment, execute the following command from the root directory:
    ```bash
-   python experiment-runner/ tasks/onnx/RunnerConfig.py
+   python experiment-runner/ tasks/onnx/RunnerConfig_<model_name>.py
    ```
 This command initiates the quantization experiments on the LLaMA3-8B model using 4-bit and 8-bit precision levels. The experiment assesses the impact of quantization on energy efficiency, accuracy, and resource utilization across various NLP tasks, including those in the GLUE and IMDB datasets.
 
 The results table is available at the folder `run_tables`, which contains detailed experiment results of different models for further analysis.
 
 ### Quantization
-The quantization code can be found in the `quantization` folder.
+The quantization code can be found in the `quantization` folder. We provide two methods for quantization, GPTQ and AWQ, by [```AutoGPTQ```](https://github.com/AutoGPTQ/AutoGPTQ) and [```AutoAWQ```](https://github.com/casper-hansen/AutoAWQ). If you want to quantize models by yourself, please follow the instrunction of these two repos at first, then set the models and datasets path in the scripts of yourself.
+
+After that, you need to convert the models to ONNX format by the script ```convert_to_onnx.py```.
 
 ### Data Analysis
 Statistical tests and visualizations are performed using R scripts to interpret the impact of quantization effectively. All data analysis scripts are stored in the `data-analysis` folder.
