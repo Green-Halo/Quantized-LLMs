@@ -34,7 +34,7 @@ import pynvml
 def init_pynvml():
     try:
         pynvml.nvmlInit()
-        output.console_log("pynvml 初始化成功")
+        output.console_log("pynvml Successfully Initialized")
         gpu_handle = pynvml.nvmlDeviceGetHandleByIndex(0)
         return True
     except pynvml.NVMLError as e:
@@ -46,7 +46,7 @@ def init_pynvml():
 def init_gpu_meter():
     try:
         gpu_meter = NvidiaGPUDomain(0)
-        output.console_log("pyJoules gpu_meter 初始化成功")
+        output.console_log("pyJoules gpu_meter Successfully Initialized")
         return gpu_meter
     except Exception as e:
         output.console_log(f"Failed to initialize pyJoules gpu_meter: {str(e)}")
@@ -62,7 +62,7 @@ gpu_meter = init_gpu_meter() if gpu_available else None
 def init_psutil():
     try:
         psutil.cpu_percent(interval=None)
-        output.console_log("psutil 初始化成功")
+        output.console_log("psutil Successfully Initialized")
         return True
     except Exception as e:
         output.console_log(f"Failed to initialize psutil: {str(e)}")
@@ -189,7 +189,7 @@ class RunnerConfig:
         output.console_log("Starting the experiment and loading the dataset...")
         
         # Load datasets
-        # imdb = load_dataset("imdb", split="test").shuffle(seed=42).select(range(self.sample_size))
+        imdb = load_dataset("imdb", split="test").shuffle(seed=42).select(range(self.sample_size))
         sst2 = load_dataset("glue", "sst2", split="validation").shuffle(seed=42).select(range(self.sample_size))
         mrpc = load_dataset("glue", "mrpc", split="validation").shuffle(seed=42).select(range(self.sample_size))
         qqp = load_dataset("glue", "qqp", split="validation").shuffle(seed=42).select(range(self.sample_size))
@@ -198,7 +198,7 @@ class RunnerConfig:
         
         # Define self.datasets
         self.datasets = {
-            # "imdb": imdb,
+            "imdb": imdb,
             "sst2": sst2,
             "mrpc": mrpc,
             "qqp": qqp,
@@ -208,7 +208,7 @@ class RunnerConfig:
 
         # Group dataset names under tasks
         self.tasks = {
-            "SA": ["sst2", "sst2"],
+            "SA": ["imdb", "sst2"],
             "SPS": ["mrpc", "qqp"],
             "NLI": ["wnli", "rte"],
         }
