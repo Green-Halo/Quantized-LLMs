@@ -23,7 +23,7 @@ Our analysis explores whether quantization, while improving energy efficiency, a
 
 ### Download models 
 1. **Windows**  
-   ```
+   ```powershell
    .\download_models\windows.ps1
    ```
 
@@ -50,10 +50,16 @@ After that, you need to convert the models to ONNX format by the script ```conve
 
 ### Data Analysis
 Statistical tests and visualizations are performed using R scripts to interpret the impact of quantization effectively. All data analysis scripts are stored in the `data-analysis` folder. The four primary scripts refer to the main four Research Questions (RQs) addressed in this study.
+
 For each script, the first step is to specify the data file to be analyzed and visualized. The two examples we provide are:
 1. **run_tables/llama.csv**: This file consists of results of different quantization models of the LLaMA-3.1-8B-Instruct model across different NLP tasks.
 2. **run_tables/qwen.csv**: This file consists of results of different quantization models of the QWEN 2.5 model across different NLP tasks.
+
 After specifying the data file, working directory, and loading the required libraries, the following command can be used to run the analysis:
    ```bash
    Rscript data-analysis/RQ1.R # For RQ1
+   Rscript data-analysis/RQ2.R # For RQ2
+   Rscript data-analysis/RQ3.R # For RQ3
+   Rscript data-analysis/RQ4.R # For RQ4
    ```
+And also, you can use ```All-in-One.ipynb``` notebook to run.
