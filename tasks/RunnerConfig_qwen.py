@@ -28,9 +28,6 @@ from pyJoules.energy_meter import measure_energy
 from pyJoules.device.nvidia_device import NvidiaGPUDomain
 from pyJoules.energy_meter import EnergyContext
 import pynvml
-import pyRAPL
-
-pyRAPL.setup()
 
 
 # Init pynvml
@@ -335,7 +332,6 @@ class RunnerConfig:
                 (
                     inference_time,
                     gpu_energy,
-                    cpu_energy,
                     accuracy,
                     gpu_busy_time,
                     cpu_busy_time,
@@ -345,27 +341,24 @@ class RunnerConfig:
                 (
                     inference_time,
                     gpu_energy,
-                    cpu_energy,
                     accuracy,
                     gpu_busy_time,
                     cpu_busy_time,
                     memory_usage,
-                ) = (0, 0, 0, 0, 0, 0, 0)
+                ) = (0, 0, 0, 0, 0, 0)
         else:
             (
                 inference_time,
                 gpu_energy,
-                cpu_energy,
                 accuracy,
                 gpu_busy_time,
                 cpu_busy_time,
                 memory_usage,
-            ) = (0, 0, 0, 0, 0, 0, 0)
+            ) = (0, 0, 0, 0, 0, 0)
 
         context.run_data = {
             "Inference Time": inference_time,
             "GPU Energy": gpu_energy,
-            "CPU Energy": cpu_energy,
             "Accuracy": accuracy,
             "GPU Busy Time": gpu_busy_time,
             "CPU Busy Time": cpu_busy_time,
@@ -438,7 +431,6 @@ class RunnerConfig:
         self, model, data, chat_template, quantization_type, task_name, batch_size=1
     ):
         total_gpu_energy = 0
-        total_cpu_energy = 0
         total_inference_time = 0
         correct_predictions = 0
 
@@ -457,8 +449,6 @@ class RunnerConfig:
                     label = item["label"]
                     labels.append(label)
 
-                    meter = pyRAPL.Measurement("Model_inference")
-                    meter.begin()
                     start_time = time.perf_counter()
                     cpu_start_time = time.process_time()
 
@@ -468,16 +458,10 @@ class RunnerConfig:
                     end_time = time.perf_counter()
                     cpu_end_time = time.process_time()
 
-                    meter.end()
-
                     inference_time = end_time - start_time
                     total_inference_time += inference_time
                     cpu_busy_time = cpu_end_time - cpu_start_time
                     total_cpu_busy_time += cpu_busy_time
-
-                    cpu_energy = meter.result.pkg[0]
-                    total_cpu_energy += cpu_energy
-
                     ctx.record(tag="inference_step")
                     output = output[:200]
                     pred_label = -1
@@ -524,7 +508,6 @@ class RunnerConfig:
         return (
             total_inference_time,  # / valid_text_count,
             total_gpu_energy,
-            total_cpu_energy,
             accuracy,
             total_gpu_busy_time,  # / valid_text_count,
             total_cpu_busy_time,  # / valid_text_count,
