@@ -32,7 +32,6 @@ import pynvml
 import pyRAPL
 
 pyRAPL.setup()
-meter = pyRAPL.Measurement("Model_inference")
 
 
 # Init pynvml
@@ -458,7 +457,7 @@ class RunnerConfig:
                     prompt = item["text"]
                     label = item["label"]
                     labels.append(label)
-
+                    meter = pyRAPL.Measurement("Model_inference")
                     meter.begin()
                     start_time = time.perf_counter()
                     cpu_start_time = time.process_time()
