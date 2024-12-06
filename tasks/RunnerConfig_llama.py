@@ -19,6 +19,7 @@ import numpy as np
 from datasets import load_dataset, concatenate_datasets
 from collections import defaultdict
 
+
 warnings.filterwarnings("ignore", category=UserWarning)
 import os
 
@@ -28,6 +29,10 @@ from pyJoules.energy_meter import measure_energy
 from pyJoules.device.nvidia_device import NvidiaGPUDomain
 from pyJoules.energy_meter import EnergyContext
 import pynvml
+import pyRAPL
+
+pyRAPL.setup()
+meter = pyRAPL.Measurement("Model_inference")
 
 
 # Init pynvml
@@ -71,6 +76,7 @@ def init_psutil():
 
 psutil_available = init_psutil()
 
+
 class LLAMA:
     def __init__(self, model_path, max_length):
         self.model = og.Model(model_path)
@@ -78,15 +84,29 @@ class LLAMA:
         self.max_length = max_length
         self.batch_size_for_cuda_graph = 1
         self.params = og.GeneratorParams(self.model)
-        self.search_options = {name: getattr(self, name) for name in ['do_sample', 'max_length', 'min_length', 'top_p', 'top_k', 'temperature', 'repetition_penalty'] if hasattr(self, name)}
+        self.search_options = {
+            name: getattr(self, name)
+            for name in [
+                "do_sample",
+                "max_length",
+                "min_length",
+                "top_p",
+                "top_k",
+                "temperature",
+                "repetition_penalty",
+            ]
+            if hasattr(self, name)
+        }
         self.params.set_search_options(**self.search_options)
-        
+
     def run(self, chat_template, prompt):
-        if chat_template.count('{') != 1 or chat_template.count('}') != 1:
-            print("Error, chat template must have exactly one pair of curly braces, e.g., 'Prompt: {input}'")
+        if chat_template.count("{") != 1 or chat_template.count("}") != 1:
+            print(
+                "Error, chat template must have exactly one pair of curly braces, e.g., 'Prompt: {input}'"
+            )
             exit(1)
         prompt_formatted = chat_template.format(input=prompt)
-                
+
         input_tokens = self.tokenizer.encode(prompt_formatted)
 
         # Set the batch size for the CUDA graph to the number of prompts if the user didn't specify a batch size
@@ -100,7 +120,7 @@ class LLAMA:
         #     # print()
         #     print(tokenizer.decode(output_tokens[i]))
         #     print()
-        
+
         generator = og.Generator(self.model, self.params)
         output = ""
         while not generator.is_done():
@@ -111,7 +131,7 @@ class LLAMA:
             output += self.tokenizer.decode(new_token)
         return output.strip()
         # file.write(output+'\n')
-     
+
 
 class RunnerConfig:
     ROOT_DIR = Path(dirname(realpath(__file__)))
@@ -173,29 +193,55 @@ class RunnerConfig:
                 "CPU Energy",
                 "Memory Energy",
                 "Accuracy",
-                "GPU Busy Time", 
-                "CPU Busy Time", 
+                "GPU Busy Time",
+                "CPU Busy Time",
                 "Memory Usage",
             ],
         )
         output.console_log("Run table model created with factors.")
         # if there is a folder named experiments in the directory with this file, delete this folder recursively
         if self.results_output_path.exists():
-            output.console_log(f"Deleting the existing folder: {self.results_output_path}")
+            output.console_log(
+                f"Deleting the existing folder: {self.results_output_path}"
+            )
             shutil.rmtree(self.results_output_path)
         return self.run_table_model
 
     def before_experiment(self) -> None:
         output.console_log("Starting the experiment and loading the dataset...")
-        
+
         # Load datasets
-        imdb = load_dataset("imdb", split="test").shuffle(seed=42).select(range(self.sample_size))
-        sst2 = load_dataset("glue", "sst2", split="validation").shuffle(seed=42).select(range(self.sample_size))
-        mrpc = load_dataset("glue", "mrpc", split="validation").shuffle(seed=42).select(range(self.sample_size))
-        qqp = load_dataset("glue", "qqp", split="validation").shuffle(seed=42).select(range(self.sample_size))
-        wnli = load_dataset("glue", "wnli", split="train").shuffle(seed=42).select(range(self.sample_size))
-        rte = load_dataset("glue", "rte", split="train").shuffle(seed=42).select(range(self.sample_size))
-        
+        imdb = (
+            load_dataset("imdb", split="test")
+            .shuffle(seed=42)
+            .select(range(self.sample_size))
+        )
+        sst2 = (
+            load_dataset("glue", "sst2", split="validation")
+            .shuffle(seed=42)
+            .select(range(self.sample_size))
+        )
+        mrpc = (
+            load_dataset("glue", "mrpc", split="validation")
+            .shuffle(seed=42)
+            .select(range(self.sample_size))
+        )
+        qqp = (
+            load_dataset("glue", "qqp", split="validation")
+            .shuffle(seed=42)
+            .select(range(self.sample_size))
+        )
+        wnli = (
+            load_dataset("glue", "wnli", split="train")
+            .shuffle(seed=42)
+            .select(range(self.sample_size))
+        )
+        rte = (
+            load_dataset("glue", "rte", split="train")
+            .shuffle(seed=42)
+            .select(range(self.sample_size))
+        )
+
         # Define self.datasets
         self.datasets = {
             "imdb": imdb,
@@ -231,8 +277,9 @@ class RunnerConfig:
 
         # Initialize data storage
         from collections import defaultdict
+
         self.datas = defaultdict(list)
-        
+
         # Process and format each dataset
         for task_name, dataset_names in self.tasks.items():
             for data_task in dataset_names:
@@ -240,28 +287,33 @@ class RunnerConfig:
                 for example in dataset:
                     formatted_text = format_example(data_task, example)
                     if formatted_text:
-                        self.datas[task_name].append({
-                            'text': formatted_text,
-                            'label': example['label']
-                        })
+                        self.datas[task_name].append(
+                            {"text": formatted_text, "label": example["label"]}
+                        )
 
         # Initialize template storage
         self.template = {}
-        
+
         # Set up templates for each task
         for task_name in self.tasks.keys():
             if task_name == "SA":
-                self.template[task_name] = """
+                self.template[
+                    task_name
+                ] = """
                 Prompt: "{input}"
                 Instruct: Answer as briefly as possible. Please determine the sentiment of the above sentence in Prompt. The options are: 0 if the sentence is negative, 1 if the sentence is positive. No analyses or explanations. Only respond with 0 or 1.
                 """
             elif task_name == "SPS":
-                self.template[task_name] = """
+                self.template[
+                    task_name
+                ] = """
                 Prompt: "{input}"
                 Instruct: Answer as briefly as possible. Please determine whether the two sentences above in Prompt are equivalent, and return 1 if they are, or 0 if they are not. No analyses or explanations. Only respond with 0 or 1.
                 """
             elif task_name == "NLI":
-                self.template[task_name] = """
+                self.template[
+                    task_name
+                ] = """
                 Prompt: "{input}"
                 Instruct: Answer as briefly as possible. From the above two sentences in Prompt, please determine whether the sentences are entailments. The options are: 0 if the sentences are entailments, 1 if they are not. No analyses or explanations. Only respond with 0 or 1.
                 """
@@ -269,7 +321,6 @@ class RunnerConfig:
         # Output the total number of samples loaded
         total_samples = sum(len(dataset) for dataset in self.datasets.values())
         output.console_log(f"Datasets loaded: {total_samples} samples.")
-
 
     def before_run(self) -> None:
         output.console_log("Preparing for the next run...")
@@ -290,7 +341,6 @@ class RunnerConfig:
                     inference_time,
                     gpu_energy,
                     cpu_energy,
-                    memory_energy,
                     accuracy,
                     gpu_busy_time,
                     cpu_busy_time,
@@ -301,29 +351,26 @@ class RunnerConfig:
                     inference_time,
                     gpu_energy,
                     cpu_energy,
-                    memory_energy,
                     accuracy,
                     gpu_busy_time,
                     cpu_busy_time,
                     memory_usage,
-                ) = (0, 0, 0, 0, 0, 0, 0, 0)
+                ) = (0, 0, 0, 0, 0, 0, 0)
         else:
             (
                 inference_time,
                 gpu_energy,
                 cpu_energy,
-                memory_energy,
                 accuracy,
                 gpu_busy_time,
                 cpu_busy_time,
                 memory_usage,
-            ) = (0, 0, 0, 0, 0, 0, 0, 0)
+            ) = (0, 0, 0, 0, 0, 0, 0)
 
         context.run_data = {
             "Inference Time": inference_time,
             "GPU Energy": gpu_energy,
             "CPU Energy": cpu_energy,
-            "Memory Energy": memory_energy,
             "Accuracy": accuracy,
             "GPU Busy Time": gpu_busy_time,
             "CPU Busy Time": cpu_busy_time,
@@ -370,13 +417,22 @@ class RunnerConfig:
         output.console_log(f"Loading model for quantization type: {quantization_type}")
 
         if quantization_type == "32-bit":
-            model = LLAMA("tasks/onnx/onnx_models/Llama-3.1-8B-Instruct-32bit-ONNX", 512)
+            model = LLAMA(
+                "tasks/onnx/onnx_models/Llama-3.1-8B-Instruct-32bit-ONNX", 512
+            )
         elif quantization_type == "16-bit":
-            model = LLAMA("tasks/onnx/onnx_models/Llama-3.1-8B-Instruct-16bit-ONNX", 512)
+            model = LLAMA(
+                "tasks/onnx/onnx_models/Llama-3.1-8B-Instruct-16bit-ONNX", 512
+            )
         elif quantization_type == "awq-4-bit":
-            model = LLAMA("tasks/onnx/onnx_models/Llama-3.1-8B-Instruct-AWQ-4bit-ONNX", 512)
+            model = LLAMA(
+                "tasks/onnx/onnx_models/Llama-3.1-8B-Instruct-AWQ-4bit-ONNX", 512
+            )
         elif quantization_type == "gptq-4-bit":
-            model = LLAMA("tasks/onnx/onnx_models/Llama-3.1-8B-Instruct-GPTQ-4bit-glue_base-ONNX", 512)
+            model = LLAMA(
+                "tasks/onnx/onnx_models/Llama-3.1-8B-Instruct-GPTQ-4bit-glue_base-ONNX",
+                512,
+            )
 
         return model
 
@@ -385,7 +441,6 @@ class RunnerConfig:
     ):
         total_gpu_energy = 0
         total_cpu_energy = 0
-        total_memory_energy = 0
         total_inference_time = 0
         correct_predictions = 0
 
@@ -400,56 +455,53 @@ class RunnerConfig:
             predictions = []
             with EnergyContext(domains=[device], start_tag="start") as ctx:
                 for item in data:
-                    prompt = item['text']
-                    label = item['label']
+                    prompt = item["text"]
+                    label = item["label"]
                     labels.append(label)
-                    
+
+                    meter.begin()
                     start_time = time.perf_counter()
                     cpu_start_time = time.process_time()
 
-                    # get CPU and memory energy
-                    cpu_start_energy = psutil.cpu_percent(interval=None)
-                    memory_start_energy = psutil.virtual_memory().percent
-                    
                     # run model
                     output = model.run(chat_template, prompt)
-                    
+
                     end_time = time.perf_counter()
                     cpu_end_time = time.process_time()
+
+                    meter.end()
+
                     inference_time = end_time - start_time
                     total_inference_time += inference_time
                     cpu_busy_time = cpu_end_time - cpu_start_time
                     total_cpu_busy_time += cpu_busy_time
 
-                    # get CPU and memory energy
-                    cpu_end_energy = psutil.cpu_percent(interval=None)
-                    memory_end_energy = psutil.virtual_memory().percent
-                    total_cpu_energy += cpu_end_energy - cpu_start_energy
-                    total_memory_energy += memory_end_energy - memory_start_energy
+                    cpu_energy = meter.result.pkg[0]
+                    total_cpu_energy += cpu_energy
 
                     ctx.record(tag="inference_step")
                     output = output[:200]
                     pred_label = -1
                     for ch in output:
-                        if ch == '0':
+                        if ch == "0":
                             pred_label = 0
                             break
-                        elif ch == '1':
+                        elif ch == "1":
                             pred_label = 1
                             break
-                        elif ch == '2':
+                        elif ch == "2":
                             pred_label = 2
                             break
-                        elif ch in [' ', '\n', '\t']:
+                        elif ch in [" ", "\n", "\t"]:
                             continue
                         else:
                             continue
                     predictions.append(pred_label)
 
-                labels = labels[:len(predictions)]
+                labels = labels[: len(predictions)]
                 labels = np.array(labels)
                 predictions = np.array(predictions)
-                correct_predictions = (predictions == labels)
+                correct_predictions = predictions == labels
                 accuracy = np.mean(correct_predictions)
 
                 gpu_busy_time = inference_time
@@ -474,7 +526,6 @@ class RunnerConfig:
             total_inference_time,  # / valid_text_count,
             total_gpu_energy,
             total_cpu_energy,
-            total_memory_energy,
             accuracy,
             total_gpu_busy_time,  # / valid_text_count,
             total_cpu_busy_time,  # / valid_text_count,
